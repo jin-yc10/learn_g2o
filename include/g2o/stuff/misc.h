@@ -29,6 +29,7 @@
 
 #include "macros.h"
 #include <cmath>
+#include <typeinfo>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -185,6 +186,25 @@ inline bool arrayHasNaN(const double* array, int size, int* nanIndex = 0)
   return false;
 }
 
+/**
+ * cross casts and downcasts; source code directly from boost/polymorphic_cast.hpp; included here to avoid dependency upon boost
+ */
+
+template <class Target, class Source>
+inline Target polymorphic_cast(Source* x)
+{
+  Target tmp = dynamic_cast<Target>(x);
+  if ( tmp == 0 ) throw( std::bad_cast() );
+  return tmp;
+}
+ 
+template <class Target, class Source>
+inline Target polymorphic_downcast(Source* x)
+{
+  assert( dynamic_cast<Target>(x) == x );  // detect logic error
+  return static_cast<Target>(x);
+}
+ 
 /**
  * The following two functions are used to force linkage with static libraries.
  */

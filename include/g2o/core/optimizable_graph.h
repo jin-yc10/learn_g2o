@@ -503,7 +503,7 @@ namespace g2o {
     virtual ~OptimizableGraph();
 
     //! adds all edges and vertices of the graph <i>g</i> to this graph.
-    void addGraph(OptimizableGraph* g);
+    void addGraph(const OptimizableGraph* g);
 
     /**
      * adds a new vertex. The new vertex is then "taken".
@@ -625,16 +625,16 @@ namespace g2o {
     bool verifyInformationMatrices(bool verbose = false) const;
 
     // helper functions to save an individual vertex
-    bool saveVertex(std::ostream& os, Vertex* v) const;
+    bool saveVertex(std::ostream& os, const Vertex* v) const;
 
     // helper function to save an individual parameter
     bool saveParameter(std::ostream& os, Parameter* v) const;
 
     // helper functions to save an individual edge
-    bool saveEdge(std::ostream& os, Edge* e) const;
+    bool saveEdge(std::ostream& os, const Edge* e) const;
 
     // helper functions to save the data packets
-    bool saveUserData(std::ostream& os, HyperGraph::Data* v) const;
+    bool saveUserData(std::ostream& os, const HyperGraph::Data* v) const;
 
     //! the workspace for storing the Jacobians of the graph
     JacobianWorkspace& jacobianWorkspace() { return _jacobianWorkspace;}

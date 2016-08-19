@@ -67,7 +67,7 @@ namespace g2o {
      * @param eset: the subgraph to be optimized.
      * @returns false if somethings goes wrong
      */
-    virtual bool initializeOptimization(HyperGraph::EdgeSet& eset);
+    virtual bool initializeOptimization(const HyperGraph::EdgeSet& eset);
 
     /**
      * Initializes the structures for optimizing a portion of the graph specified by a subset of vertices.
@@ -77,7 +77,7 @@ namespace g2o {
      * @param level: is the level (in multilevel optimization)
      * @returns false if somethings goes wrong
      */
-    virtual bool initializeOptimization(HyperGraph::VertexSet& vset, int level=0);
+    virtual bool initializeOptimization(const HyperGraph::VertexSet& vset, int level=0);
 
     /**
      * Initializes the structures for optimizing the whole graph.

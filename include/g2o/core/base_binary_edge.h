@@ -65,7 +65,7 @@ namespace g2o {
       _hessianTransposed(0, VertexXjType::Dimension, VertexXiType::Dimension),
       _jacobianOplusXi(0, D, Di), _jacobianOplusXj(0, D, Dj)
       {
-        _vertices.resize(2);
+        BaseEdge<D,E>::resize(2);
       }
 
       virtual OptimizableGraph::Vertex* createFrom();

@@ -49,6 +49,7 @@ void BaseBinaryEdge<D, E, VertexXiType, VertexXjType>::resize(size_t size)
 {
   if (size != 2) {
     std::cerr << "WARNING, attempting to resize binary edge " << BaseEdge<D, E>::id() << " to " << size << std::endl;
+    assert(0 && "error resizing binary edge where size != 2");
   }
   BaseEdge<D, E>::resize(size);
 }

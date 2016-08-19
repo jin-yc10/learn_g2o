@@ -1,5 +1,6 @@
 build
 lib/*.so
+lib/*.dylib
 bin/*
 data/problem-16-22106-pre.txt
 .idea

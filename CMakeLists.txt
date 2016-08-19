@@ -20,8 +20,10 @@ include_directories(${CMAKE_SOURCE_DIR}/src
         ${CHOLMOD_INCLUDE_DIR}
         ${OpenCV_INCLUDE_DIR}
         ${G2O_INCLUDE_DIR}
-        /usr/include/eigen3/)
-link_directories(/usr/lib/x86_64-linux-gnu/)
+        /usr/include/eigen3/
+        /usr/local/include/eigen3/
+        )
+link_directories(/usr/lib/x86_64-linux-gnu/ /usr/local/lib/)
 
 add_executable(test_optimize main.cpp)
 target_link_libraries(test_optimize ${OpenCV_LIBS}

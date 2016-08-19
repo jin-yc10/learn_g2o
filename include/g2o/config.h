@@ -12,7 +12,7 @@
 #define G2O_HAVE_CHOLMOD 1
 #define G2O_HAVE_CSPARSE 1
 
-#define G2O_CXX_COMPILER "GNU /usr/bin/c++"
+#define G2O_CXX_COMPILER "Clang /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++"
 
 #ifdef __cplusplus
 #include <g2o/core/eigen_types.h>

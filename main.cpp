@@ -42,7 +42,7 @@ using namespace std;
 using namespace Eigen;
 
 // rx, ry, rz, tx, ty, tz, f, k1, k2
-class VertexCameraBAL : public BaseVertex<9, Eigen::VectorXd>
+class VertexCameraBAL : public BaseVertex<7, Eigen::VectorXd>
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -151,6 +151,7 @@ public:
     template<typename T>
     bool operator()(const T* camera, const T* point, T* error) const {
         // Rodrigues' formula for the rotation
+        // v_rot = v dot cos(th) + (k cross v) sin th + k(k dot v)(1-cos th)
         T p[3];
         T theta = sqrt(squaredNorm(camera));
         if (theta > T(0)) {
@@ -181,20 +182,22 @@ public:
         p[1] += camera[4];
         p[2] += camera[5];
 
-        // perspective division
-        T projectedPoint[2];
-        projectedPoint[0] = - p[0] / p[2];
-        projectedPoint[1] = - p[1] / p[2];
+
 
         // conversion to pixel coordinates
-        T radiusSqr = projectedPoint[0]*projectedPoint[0] + projectedPoint[1]*projectedPoint[1];
+//        T radiusSqr = projectedPoint[0]*projectedPoint[0] + projectedPoint[1]*projectedPoint[1];
         T f         = T(camera[6]);
-        T k1        = T(camera[7]);
-        T k2        = T(camera[8]);
+        T cx        = T(camera[7]);
+        T cy        = T(camera[8]);
         T r_p       = T(1);// + k1 * radiusSqr + k2 * radiusSqr * radiusSqr;
+        // perspective division
+        T projectedPoint[2];
+        projectedPoint[0] = p[0] / p[2];
+        projectedPoint[1] = p[1] / p[2];
+        // prediction
         T prediction[2];
-        prediction[0] = f * r_p * projectedPoint[0];
-        prediction[1] = f * r_p * projectedPoint[1];
+        prediction[0] = f * projectedPoint[0] + T(320);
+        prediction[1] = f * projectedPoint[1] + T(240);
 
         error[0] = prediction[0] - T(measurement()(0));
         error[1] = prediction[1] - T(measurement()(1));
@@ -261,7 +264,8 @@ class Problem {
 // Problem arguments
     // camera arguments
     float intrinsics[5] = {800.0f, 320.0f, 240.0f, 0.0f, 0.0f}; // focal, principle x, y, k1, k2
-    float noisy_intrinsic[5] = {810.123f, 320.0f, 240.0f, 0.0f, 0.0f};
+    float noisy_intrinsic[5] = {830.0f, 320.0f, 240.0f, 0.0f, 0.0f};
+//            {810.123f, 320.0f, 240.0f, 0.0f, 0.0f};
     float noisy_pose[3*21]; // rough assumption
     cv::Mat NoisePoseMat;
 
@@ -298,8 +302,8 @@ class Problem {
         cv::Mat project = K*(R*MeanPoseMat.t()+t);
         for(int i=0; i<21; i++) {
             cv::Point2f pt;
-            pt.x = project.at<float>(0,i)/project.at<float>(2,i);// + Sample::uniform(-2, 2);
-            pt.y = project.at<float>(1,i)/project.at<float>(2,i);// + Sample::uniform(-2, 2);
+            pt.x = project.at<float>(0,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
+            pt.y = project.at<float>(1,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
             ob.pts_2d[i*2+0] = pt.x;
             ob.pts_2d[i*2+1] = pt.y;
             ob.vpts.push_back(pt);
@@ -355,7 +359,9 @@ public:
 
             // add some noise to the mean pose
             for(int j=0; j<3; j++)
-                noisy_pose[3*i+j] = mean_pose[3*i+j] + Sample::uniform(-5,5);
+                noisy_pose[3*i+j] = mean_pose[3*i+j];
+//            int j=2;
+//            noisy_pose[3*i+j] = mean_pose[3*i+j] * 0.9f + Sample::uniform(-1,1);
         }
         MeanPoseMat = cv::Mat(21, 3, CV_32F, mean_pose);
         NoisePoseMat = cv::Mat(21, 3, CV_32F, noisy_pose);
@@ -378,7 +384,7 @@ public:
     void solve() {
 
         int maxIterations = 20;
-        typedef g2o::BlockSolver< g2o::BlockSolverTraits<9, 3> >  BalBlockSolver;
+        typedef g2o::BlockSolver< g2o::BlockSolverTraits<7, 3> >  BalBlockSolver;
         string choleskySolverName = "CHOLMOD";
         typedef g2o::LinearSolverCholmod<BalBlockSolver::PoseMatrixType> BalLinearSolver;
         g2o::SparseOptimizer optimizer;
@@ -450,20 +456,20 @@ public:
         LOG(WARNING) << "Add Edges done.";
 
         // fill the estimation
-        Eigen::VectorXd cameraParameter(9);
+        Eigen::VectorXd cameraParameter(7);
         for (int i = 0; i < numCameras; ++i) {
             for(int j=0; j<6; j++) {
                 cameraParameter(j) = obs[i].observation_cam[j];
             }
             cameraParameter(6) = noisy_intrinsic[0];
-            cameraParameter(7) = noisy_intrinsic[3];
-            cameraParameter(8) = noisy_intrinsic[4];
+            // cameraParameter(7) = noisy_intrinsic[1];
+            // cameraParameter(8) = noisy_intrinsic[2];
 
             VertexCameraBAL* cam = cameras[i];
             cam->setEstimate(cameraParameter);
             if( i==0 ) {
                 cout << "Camera #0 parameters: " << endl;
-                for (int j = 0; j < 9; ++j)
+                for (int j = 0; j < 7; ++j)
                     cout << cameraParameter(j) << " ";
             }
         }
@@ -490,6 +496,14 @@ public:
             cout << MeanPoseMat.row(i) << "\t" <<
                     NoisePoseMat.row(i) << "\t" <<
                     points[i]->estimate().transpose() << endl;
+        }
+        for(auto cam_it=cameras.begin();
+            cam_it != cameras.end();
+            cam_it ++){
+            for (int j = 0; j < 7; ++j) {
+                cout << (*cam_it)->estimate()[j] << " ";
+            }
+            cout << endl;
         }
     }
 
