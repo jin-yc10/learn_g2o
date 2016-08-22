@@ -50,6 +50,17 @@ class ObservationSet {
         cv::Mat pt_3d; bool noisy_pt_3d;
         bool noisy_pt_2d;
     };
+
     struct Observe {
+        std::vector<cv::Point2f> pt_2d;
+        cv::Mat real_R, real_t;
     };
+
+    Params params;
+
+public:
+    ObservationSet(const Params params): params(params){};
+    void build() {
+
+    }
 };
