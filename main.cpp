@@ -37,6 +37,13 @@ DEFINE_int32(obs_number, 100, "observation count");
 #include "g2o/solvers/csparse/linear_solver_csparse.h"
 #endif
 
+#define NO_2D_NOISE 1
+#define NO_3D_NOISE 1
+
+DEFINE_bool(3D_noise, false, "add noise to 3d pose");
+DEFINE_bool(2D_noise, false, "add noise to 2d observation");
+DEFINE_bool(Cam_noise, false, "add noise to camera intrinsics");
+
 using namespace g2o;
 using namespace std;
 using namespace Eigen;
@@ -264,7 +271,7 @@ class Problem {
 // Problem arguments
     // camera arguments
     float intrinsics[5] = {800.0f, 320.0f, 240.0f, 0.0f, 0.0f}; // focal, principle x, y, k1, k2
-    float noisy_intrinsic[5] = {830.0f, 320.0f, 240.0f, 0.0f, 0.0f};
+    float noisy_intrinsic[5] = {1000.0f, 320.0f, 240.0f, 0.0f, 0.0f};
 //            {810.123f, 320.0f, 240.0f, 0.0f, 0.0f};
     float noisy_pose[3*21]; // rough assumption
     cv::Mat NoisePoseMat;
@@ -293,21 +300,29 @@ class Problem {
         dt[0] += 6.0f;
 
         static float dr[3] = {0.0, -3.1415926*0.5, 0.0}; // Rodrigues form
-//        dr[1] += 3.1415926f * 0.01f;
+        dr[1] += 3.1415926f * 0.01f;
 
         cv::Mat R, rvec(1,3,CV_32F,dr);
         cv::Rodrigues(rvec, R);
         cv::Mat t = cv::Mat(3,1,CV_32F,dt);
         cv::repeat(t, 1, 21, t);
         cv::Mat project = K*(R*MeanPoseMat.t()+t);
+
         for(int i=0; i<21; i++) {
             cv::Point2f pt;
-            pt.x = project.at<float>(0,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
-            pt.y = project.at<float>(1,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
+            if(FLAGS_2D_noise) {
+                pt.x = project.at<float>(0,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
+                pt.y = project.at<float>(1,i)/project.at<float>(2,i) + Sample::uniform(-2, 2);
+            } else {
+                pt.x = project.at<float>(0,i)/project.at<float>(2,i);// + Sample::uniform(-2, 2);
+                pt.y = project.at<float>(1,i)/project.at<float>(2,i);// + Sample::uniform(-2, 2);
+            }
             ob.pts_2d[i*2+0] = pt.x;
             ob.pts_2d[i*2+1] = pt.y;
             ob.vpts.push_back(pt);
         }
+        LOG(WARNING) << ob.pts_2d[17]-ob.pts_2d[16];
+
         memcpy(ob.real_cam, dr, 3*sizeof(float));
         memcpy(ob.real_cam+3, dt, 3*sizeof(float));
 
@@ -349,27 +364,55 @@ class Problem {
 public:
     Problem(std::string file_path) :
             K(3,3,CV_32F,raw_k),
-            noisy_K(3,3,CV_32F,noisy_raw_k),
             dist(1,5,CV_32F) {
         std::ifstream ifs(file_path);
-        for(int i=0; i<21; i++) {
-            ifs >> mean_pose[3*i+0]
+        if(FLAGS_Cam_noise) {
+            noisy_K = cv::Mat(3,3,CV_32F,noisy_raw_k);
+        } else {
+            noisy_K = cv::Mat(3,3,CV_32F,raw_k); // use the real camera intrinsic
+        }
+        string outputFilename = "mean.wrl";
+        if (outputFilename.size() > 0) {
+            ofstream fout(outputFilename.c_str()); // loadable with meshlab
+            fout
+            << "#VRML V2.0 utf8\n"
+            << "Shape {\n"
+            << "  appearance Appearance {\n"
+            << "    material Material {\n"
+            << "      diffuseColor " << 0 << " " << 1 << " " << 0 << "\n"
+            << "      ambientIntensity 0.2\n"
+            << "      emissiveColor 0.0 0.0 0.0\n"
+            << "      specularColor 0.0 0.0 0.0\n"
+            << "      shininess 0.2\n"
+            << "      transparency 0.0\n"
+            << "    }\n"
+            << "  }\n"
+            << "  geometry PointSet {\n"
+            << "    coord Coordinate {\n"
+            << "      point [\n";
+            for(int i=0; i<21; i++) {
+                ifs >> mean_pose[3*i+0]
                 >> mean_pose[3*i+1]
                 >> mean_pose[3*i+2];
-
-            // add some noise to the mean pose
-            for(int j=0; j<3; j++)
-                noisy_pose[3*i+j] = mean_pose[3*i+j];
-//            int j=2;
-//            noisy_pose[3*i+j] = mean_pose[3*i+j] * 0.9f + Sample::uniform(-1,1);
+                fout << mean_pose[3*i+0] << " " << mean_pose[3*i+1] << " " << mean_pose[3*i+2] << endl;
+                // add some noise to the mean pose
+                for(int j=0; j<3; j++)
+                    noisy_pose[3*i+j] = mean_pose[3*i+j];
+                if( FLAGS_3D_noise ) {
+                    int j=2;
+                    noisy_pose[3*i+j] = mean_pose[3*i+j] + Sample::uniform(-1,1);
+                }
+            }
+            fout << "    ]\n" << "  }\n" << "}\n" << "  }\n";
+            fout.flush();
+            fout.close();
         }
+
         MeanPoseMat = cv::Mat(21, 3, CV_32F, mean_pose);
         NoisePoseMat = cv::Mat(21, 3, CV_32F, noisy_pose);
         std::cout << MeanPoseMat << std::endl << NoisePoseMat << std::endl;
-        // 100 observation
 
         LOG(WARNING) << "FLAGS_obs_number = " << FLAGS_obs_number;
-
         std::cout << "noisy_K=" << noisy_K << std::endl;
         dist.setTo(0);
         std::cout << "dist=" << dist << std::endl;
@@ -377,6 +420,8 @@ public:
         for(int i=0; i<FLAGS_obs_number; i++) {
             observation ob;
             fill(ob);
+//            show(ob);
+//            cv::waitKey(100);
             obs.push_back(ob);
         }
     }
@@ -461,7 +506,7 @@ public:
             for(int j=0; j<6; j++) {
                 cameraParameter(j) = obs[i].observation_cam[j];
             }
-            cameraParameter(6) = noisy_intrinsic[0];
+            cameraParameter(6) = intrinsics[0];
             // cameraParameter(7) = noisy_intrinsic[1];
             // cameraParameter(8) = noisy_intrinsic[2];
 
@@ -476,7 +521,7 @@ public:
         Eigen::Vector3d p;
         for (int i = 0; i < numPoints; ++i) {
             for(int j=0 ; j<3; j++) {
-                p(j) = noisy_pose[3*i+j];
+                p(j) = mean_pose[3*i+j];
             }
             VertexPointBAL* point = points[i];
             point->setEstimate(p);
@@ -497,13 +542,52 @@ public:
                     NoisePoseMat.row(i) << "\t" <<
                     points[i]->estimate().transpose() << endl;
         }
+        string outputFilename = "pose.wrl";
+        if (outputFilename.size() > 0) {
+            ofstream fout(outputFilename.c_str()); // loadable with meshlab
+            fout
+            << "#VRML V2.0 utf8\n"
+            << "Shape {\n"
+            << "  appearance Appearance {\n"
+            << "    material Material {\n"
+            << "      diffuseColor " << 1 << " " << 0 << " " << 0 << "\n"
+            << "      ambientIntensity 0.2\n"
+            << "      emissiveColor 0.0 0.0 0.0\n"
+            << "      specularColor 0.0 0.0 0.0\n"
+            << "      shininess 0.2\n"
+            << "      transparency 0.0\n"
+            << "    }\n"
+            << "  }\n"
+            << "  geometry PointSet {\n"
+            << "    coord Coordinate {\n"
+            << "      point [\n";
+            for (vector<VertexPointBAL*>::const_iterator it = points.begin(); it != points.end(); ++it) {
+                fout << (*it)->estimate().transpose() << endl;
+            }
+            fout << "    ]\n" << "  }\n" << "}\n" << "  }\n";
+            fout.flush();
+            fout.close();
+        }
+        int idx = 0;
         for(auto cam_it=cameras.begin();
             cam_it != cameras.end();
             cam_it ++){
+
+            cout << "/ ";
             for (int j = 0; j < 7; ++j) {
-                cout << (*cam_it)->estimate()[j] << " ";
+                cout << std::setw(12) << (*cam_it)->estimate()[j] << " ";
             }
+            cout << "\n| ";
+            for (int j = 0; j < 6; ++j) {
+                cout << std::setw(12) << obs[idx].observation_cam[j] << " ";
+            }
+            cout << "\n\\ ";
+            for (int j = 0; j < 6; ++j) {
+                cout << std::setw(12) << obs[idx].real_cam[j] << " ";
+            }
+            cout << std::setw(12) << "800";
             cout << endl;
+            idx ++;
         }
     }
 

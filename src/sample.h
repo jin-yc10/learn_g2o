@@ -1,4 +1,6 @@
 #include <cmath>
+#include <gflags/gflags.h>
+#include <glog/logging.h>
 
 using namespace std;
 
@@ -34,3 +36,20 @@ double Sample::uniform(){
 double Sample::gaussian(double sigma){
   return gauss_rand(0., sigma);
 }
+
+DEFINE_bool(noisy_cam, false, "add noise to camera");
+DEFINE_bool(noisy_3d, false, "add noise to 3d pts");
+DEFINE_bool(noisy_2d, false, "add noise to 2d pts");
+
+class ObservationSet {
+    struct Params {
+        int nOb;
+        int nPt;
+        cv::Size sz;
+        cv::Mat K; bool noisy_cam;
+        cv::Mat pt_3d; bool noisy_pt_3d;
+        bool noisy_pt_2d;
+    };
+    struct Observe {
+    };
+};
