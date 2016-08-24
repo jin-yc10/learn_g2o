@@ -1,6 +1,7 @@
 #include <cmath>
 #include <gflags/gflags.h>
 #include <glog/logging.h>
+#include <opencv2/opencv.hpp>
 
 using namespace std;
 
@@ -43,30 +44,26 @@ DEFINE_bool(noisy_cam, false, "add noise to camera");
 DEFINE_bool(noisy_3d, false, "add noise to 3d pts");
 DEFINE_bool(noisy_2d, false, "add noise to 2d pts");
 
+struct Observe {
+    std::vector<cv::Point2f> pt_2d;
+    cv::Mat real_R, real_t;
+};
+
 class ObservationSet {
+
+public:
     struct Params {
         int nOb;
         int nPt;
         cv::Size sz;
         cv::Mat K;
-        bool noisy_cam;
         cv::Mat pt_3d;
-        bool noisy_pt_3d;
-        bool noisy_pt_2d;
     };
 
-    struct Observe {
-        std::vector<cv::Point2f> pt_2d;
-        cv::Mat real_R, real_t;
-    };
-
-    Params params;
     std::vector<Observe> obs;
-public:
     ObservationSet(const Params params) : params(params) { };
-
-    void build() {
-        Observe ob;
-        obs.push_back(ob);
-    }
+    virtual void generate() = 0;
+    virtual void report() = 0;
+protected:
+    Params params;
 };

@@ -34,3 +34,6 @@ add_executable(bal_example bal_example.cpp)
 target_link_libraries(bal_example ${OpenCV_LIBS}
         ${G2O_CORE_LIBRARY} ${G2O_STUFF_LIBRARY} ${G2O_SOLVER_CHOLMOD} ${CHOLMOD_LIBRARIES}
         gflags glog)
+
+add_executable(test_f test_f.cpp)
+target_link_libraries(test_f ${OpenCV_LIBS} gflags glog)
